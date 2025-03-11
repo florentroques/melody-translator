@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Melody Translator</title>
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@1.2.0/dist/flowbite.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pitchy@2.0.3/dist/pitchy.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #5D5CDE;
+            --background-light: #FFFFFF;
+            --background-dark: #181818;
+            --text-light: #333333;
+            --text-dark: #F8F8F8;
+            --card-light: #F5F5F5;
+            --card-dark: #252525;
+            --border-light: #E0E0E0;
+            --border-dark: #3A3A3A;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+            background-color: var(--background-light);
+            color: var(--text-light);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: var(--background-dark);
+                color: var(--text-dark);
+            }
+
+            .card {
+                background-color: var(--card-dark);
+                border-color: var(--border-dark);
+            }
+        }
+
+        @media (prefers-color-scheme: light) {
+            .card {
+                background-color: var(--card-light);
+                border-color: var(--border-light);
+            }
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 0.5rem 0.25rem;
+            border: none;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background-color: #E0E0E0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background-color: #D0D0D0;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .visualization {
+            width: 100%;
+            height: 150px;
+            margin: 1rem 0;
+            position: relative;
+            overflow: hidden;
+            border-radius: 0.5rem;
+        }
+
+        #waveform {
+            width: 100%;
+            height: 100%;
+            background-color: rgba(93, 92, 222, 0.1);
+            position: relative;
+        }
+
+        .recording-indicator {
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #f44336;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(244, 67, 54, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(244, 67, 54, 0);
+            }
+        }
+
+        #statusText {
+            text-align: center;
+            margin: 1rem 0;
+            font-weight: 500;
+            min-height: 1.5rem;
+        }
+
+        .visualizer-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 1rem;
+        }
+
+        .meter {
+            height: 20px;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            background-color: rgba(93, 92, 222, 0.1);
+        }
+
+        .meter span {
+            display: block;
+            height: 100%;
+            width: 0%;
+            background-color: var(--primary-color);
+            transition: width 0.1s ease;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #resultCard {
+            display: none;
+        }
+
+        .wave {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wave-bar {
+            background-color: var(--primary-color);
+            width: 5px;
+            margin: 0 3px;
+            border-radius: 2px;
+            animation: wave-animation 0.5s infinite ease-in-out alternate;
+        }
+
+        @keyframes wave-animation {
+            0% { transform: scaleY(0.2); }
+            100% { transform: scaleY(1); }
+        }
+
+        .wave-bars {
+            display: flex;
+            align-items: center;
+            height: 60px;
+        }
+
+        #noteDisplay {
+            font-family: monospace;
+            margin-top: 0.5rem;
+            min-height: 1.5rem;
+            text-align: center;
+        }
+
+        .responsive-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+
+        @media (max-width: 640px) {
+            .controls {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="text-3xl font-bold">Melody Translator</h1>
+            <p class="mt-2 text-lg">Hum or sing a tune, and we'll transform it into instrumental music</p>
+        </div>
+
+        <div class="card">
+            <div class="visualization">
+                <div id="waveform">
+                    <div class="wave">
+                        <div class="wave-bars" id="waveBars"></div>
+                    </div>
+                </div>
+                <div class="recording-indicator" id="recordingIndicator"></div>
+            </div>
+
+            <div class="meter">
+                <span id="volumeMeter"></span>
+            </div>
+
+            <div id="noteDisplay"></div>
+
+            <div id="statusText">Ready to record your melody</div>
+
+            <div class="controls">
+                <button id="recordBtn" class="btn btn-primary">
+                    <svg class="responsive-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="6" fill="currentColor"/>
+                    </svg>
+                    <span>Start Recording</span>
+                </button>
+
+                <button id="stopBtn" class="btn btn-secondary" disabled>
+                    <svg class="responsive-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="7" y="7" width="10" height="10" fill="currentColor"/>
+                    </svg>
+                    <span>Stop</span>
+                </button>
+
+                <button id="generateBtn" class="btn btn-primary" disabled>
+                    <svg class="responsive-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 5V19L19 12L8 5Z" fill="currentColor"/>
+                    </svg>
+                    <span>Generate Music</span>
+                </button>
+            </div>
+
+            <div class="text-sm text-center opacity-75">
+                <p>Best results come from clear, steady humming or singing</p>
+                <p class="mt-1">Try a simple melody of 10-20 seconds</p>
+            </div>
+        </div>
+
+        <div id="resultCard" class="card">
+            <h2 class="text-xl font-semibold mb-4">Your Instrumental Version</h2>
+
+            <div class="controls">
+                <button id="playBtn" class="btn btn-primary">
+                    <svg class="responsive-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 5V19L19 12L8 5Z" fill="currentColor"/>
+                    </svg>
+                    <span>Play Instrumental</span>
+                </button>
+
+                <button id="stopInstrumentalBtn" class="btn btn-secondary" disabled>
+                    <svg class="responsive-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="7" y="7" width="10" height="10" fill="currentColor"/>
+                    </svg>
+                    <span>Stop</span>
+                </button>
+
+                <button id="reRecordBtn" class="btn btn-secondary">
+                    <svg class="responsive-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4.01 7.58 4.01 12C4.01 16.42 7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.83 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12C6 8.69 8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z" fill="currentColor"/>
+                    </svg>
+                    <span>Record New Melody</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM Elements
+            const recordBtn = document.getElementById('recordBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const generateBtn = document.getElementById('generateBtn');
+            const playBtn = document.getElementById('playBtn');
+            const stopInstrumentalBtn = document.getElementById('stopInstrumentalBtn');
+            const reRecordBtn = document.getElementById('reRecordBtn');
+            const statusText = document.getElementById('statusText');
+            const volumeMeter = document.getElementById('volumeMeter');
+            const recordingIndicator = document.getElementById('recordingIndicator');
+            const resultCard = document.getElementById('resultCard');
+            const noteDisplay = document.getElementById('noteDisplay');
+            const waveBars = document.getElementById('waveBars');
+
+            // Initialize wave bars
+            for (let i = 0; i < 10; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'wave-bar';
+                bar.style.height = '10%';
+                bar.style.animationDelay = `${i * 0.1}s`;
+                waveBars.appendChild(bar);
+            }
+
+            // Audio recording variables
+            let mediaRecorder;
+            let audioContext;
+            let audioStream;
+            let analyser;
+            let audioChunks = [];
+            let recordedBlob;
+            let isRecording = false;
+            let noteDetector;
+            let pitchDetector;
+            let recordingDuration = 0;
+            let recordingInterval;
+            let noteData = [];
+
+            // Tone.js instruments
+            let synth;
+            let isPlaying = false;
+            let melody = null;
+
+            // Initialize audio setup
+            async function setupAudio() {
+                try {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                    const source = audioContext.createMediaStreamSource(audioStream);
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 2048;
+                    source.connect(analyser);
+
+                    // Initialize pitch detection
+                    pitchDetector = Pitchy.PitchDetector.forFloat32Array(analyser.fftSize);
+                    noteDetector = Pitchy.NoteDetector.standard();
+
+                    return true;
+                } catch (err) {
+                    console.error('Error accessing microphone:', err);
+                    statusText.textContent = 'Error: Could not access microphone. Please check permissions.';
+                    statusText.style.color = '#f44336';
+                    return false;
+                }
+            }
+
+            // Start recording
+            async function startRecording() {
+                audioChunks = [];
+                noteData = [];
+                recordingDuration = 0;
+
+                if (!audioContext) {
+                    const setupSuccessful = await setupAudio();
+                    if (!setupSuccessful) return;
+                }
+
+                mediaRecorder = new MediaRecorder(audioStream);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    generateBtn.disabled = false;
+                    statusText.textContent = `Recording finished (${(recordingDuration/1000).toFixed(1)}s). Ready to generate music.`;
+                    stopVisualizer();
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.disabled = true;
+                stopBtn.disabled = false;
+                generateBtn.disabled = true;
+                statusText.textContent = 'Recording... Sing or hum your melody';
+                recordingIndicator.style.display = 'block';
+
+                // Start duration timer
+                recordingInterval = setInterval(() => {
+                    recordingDuration += 100;
+                    updateVisualization();
+                }, 100);
+
+                startVisualizer();
+            }
+
+            // Stop recording
+            function stopRecording() {
+                if (mediaRecorder && isRecording) {
+                    mediaRecorder.stop();
+                    isRecording = false;
+                    recordBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    recordingIndicator.style.display = 'none';
+                    clearInterval(recordingInterval);
+                }
+            }
+
+            // Update visualization during recording
+            function updateVisualization() {
+                if (!analyser) return;
+
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                analyser.getByteFrequencyData(dataArray);
+
+                // Calculate volume level (average amplitude)
+                let sum = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    sum += dataArray[i];
+                }
+                const average = sum / bufferLength;
+                const volume = Math.min(100, average * 2); // Scale for better visualization
+
+                // Update volume meter
+                volumeMeter.style.width = `${volume}%`;
+
+                // Detect pitch
+                if (pitchDetector && audioContext) {
+                    const floatData = new Float32Array(analyser.fftSize);
+                    analyser.getFloatTimeDomainData(floatData);
+
+                    const [pitch, clarity] = pitchDetector.findPitch(floatData, audioContext.sampleRate);
+
+                    if (clarity > 0.7 && pitch > 50) { // Only register clear pitches
+                        const note = noteDetector.noteFromPitch(pitch);
+                        noteDisplay.textContent = `Note: ${note.name} (${pitch.toFixed(1)} Hz)`;
+
+                        // Record note data for melody analysis
+                        noteData.push({
+                            pitch: pitch,
+                            note: note.name,
+                            octave: note.octave,
+                            time: recordingDuration,
+                            clarity: clarity
+                        });
+
+                        // Animate the wave bars based on pitch
+                        updateWaveBars(pitch);
+                    }
+                }
+            }
+
+            // Update wave bars based on pitch
+            function updateWaveBars(pitch) {
+                // Map pitch to bar heights (higher pitch = taller bars)
+                const minPitch = 80;  // Approximately E2
+                const maxPitch = 1000; // Approximately B5
+                const normalizedPitch = Math.min(Math.max((pitch - minPitch) / (maxPitch - minPitch), 0), 1);
+
+                const bars = waveBars.querySelectorAll('.wave-bar');
+                bars.forEach((bar, i) => {
+                    // Create wave-like pattern based on index and pitch
+                    let height = 30 + normalizedPitch * 70; // Base height between 30% and 100%
+
+                    // Add some variation based on bar position
+                    const position = i / (bars.length - 1); // 0 to 1
+                    const offset = Math.sin(position * Math.PI + (recordingDuration / 200)) * 20;
+                    height += offset;
+
+                    // Ensure height stays within bounds
+                    height = Math.max(Math.min(height, 100), 10);
+
+                    bar.style.height = `${height}%`;
+                });
+            }
+
+            // Start wave bar animation
+            function startVisualizer() {
+                const bars = waveBars.querySelectorAll('.wave-bar');
+                bars.forEach((bar, i) => {
+                    bar.style.animation = 'wave-animation 0.5s infinite ease-in-out alternate';
+                    bar.style.animationDelay = `${i * 0.1}s`;
+                });
+            }
+
+            // Stop wave bar animation
+            function stopVisualizer() {
+                const bars = waveBars.querySelectorAll('.wave-bar');
+                bars.forEach(bar => {
+                    bar.style.animation = 'none';
+                    bar.style.height = '10%';
+                });
+            }
+
+            // Process recorded audio and generate music
+            async function generateMusic() {
+                if (!recordedBlob) return;
+
+                generateBtn.disabled = true;
+                generateBtn.innerHTML = '<span class="loading"></span>Generating...';
+                statusText.textContent = 'Analyzing melody and generating instrumental...';
+
+                try {
+                    // Process the note data to create a coherent melody
+                    const processedMelody = processMelodyData(noteData);
+
+                    // Send the processed melody to Claude to generate MIDI-like sequence
+                    await requestMusicGeneration(processedMelody);
+
+                    // Show the result card
+                    resultCard.style.display = 'block';
+                    playBtn.disabled = false;
+                    stopInstrumentalBtn.disabled = true;
+
+                    statusText.textContent = 'Music generated! Click Play to listen.';
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = '<svg class="responsive-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 5V19L19 12L8 5Z" fill="currentColor"/></svg><span>Generate Music</span>';
+                } catch (error) {
+                    console.error('Error generating music:', error);
+                    statusText.textContent = 'Error generating music. Please try again.';
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = '<svg class="responsive-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 5V19L19 12L8 5Z" fill="currentColor"/></svg><span>Generate Music</span>';
+                }
+            }
+
+            // Process melody data to create a coherent sequence
+            function processMelodyData(notes) {
+                if (notes.length === 0) return [];
+
+                // Filter out noisy data
+                const filteredNotes = notes.filter(note => note.clarity > 0.8);
+
+                // Quantize time and merge similar consecutive notes
+                let quantizedNotes = [];
+                let currentNote = null;
+
+                for (const note of filteredNotes) {
+                    if (!currentNote ||
+                        note.note !== currentNote.note ||
+                        note.time - currentNote.time > 200) { // New note if different or gap > 200ms
+
+                        if (currentNote) {
+                            // Add duration to previous note
+                            currentNote.duration = Math.max(
+                                100, // Minimum 100ms note
+                                note.time - currentNote.time
+                            );
+                            quantizedNotes.push(currentNote);
+                        }
+
+                        // Start new note
+                        currentNote = { ...note };
+                    }
+                }
+
+                // Add the last note
+                if (currentNote) {
+                    currentNote.duration = 300; // Default duration for last note
+                    quantizedNotes.push(currentNote);
+                }
+
+                return quantizedNotes;
+            }
+
+            // Request music generation from Claude
+            async function requestMusicGeneration(melodyData) {
+                // Format the melody data for Claude
+                const formattedMelody = melodyData.map(note => ({
+                    note: note.note,
+                    octave: note.octave,
+                    duration: note.duration
+                }));
+
+                // Create a simplified melody summary
+                const melodySummary = formattedMelody.map(n =>
+                    `${n.note}${n.octave}:${Math.round(n.duration)}`
+                ).join(', ');
+
+                // Register handler for Claude responses
+                window.Poe.registerHandler("melody-handler", (result) => {
+                    if (result.status === "complete") {
+                        try {
+                            const response = result.responses[0];
+                            if (response.status === "complete") {
+                                // Extract JSON from Claude's response
+                                const jsonContent = response.content;
+                                let musicData;
+
+                                // Try to parse the JSON
+                                try {
+                                    // First try to extract JSON if it's wrapped in code blocks
+                                    const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/) ||
+                                                     jsonContent.match(/\{[\s\S]*\}/);
+
+                                    if (jsonMatch) {
+                                        musicData = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+                                    } else {
+                                        musicData = JSON.parse(jsonContent);
+                                    }
+
+                                    // Create the melody from the processed data
+                                    createMelody(musicData);
+                                } catch (jsonError) {
+                                    console.error("Error parsing JSON:", jsonError);
+                                    statusText.textContent = 'Error processing melody. Please try again.';
+                                    fallbackMelodyGeneration(formattedMelody);
+                                }
+                            }
+                        } catch (error) {
+                            console.error("Error processing Claude response:", error);
+                            statusText.textContent = 'Error processing melody. Generating simple melody instead.';
+                            fallbackMelodyGeneration(formattedMelody);
+                        }
+                    }
+                });
+
+                try {
+                    // Send the melody data to Claude
+                    await window.Poe.sendUserMessage(
+                        `@Claude-3.7-Sonnet I've recorded a melody by humming/singing. Below is the sequence of notes I detected.
+                        Please analyze this melody and create a harmonized instrumental version with chords and accompaniment.
+
+                        Provide ONLY raw JSON in your response with no explanations, additional text, or code block formatting (no \`\`\`).
+
+                        The melody notes are: ${melodySummary}
+
+                        Return a JSON object with these properties:
+                        1. "melody": Array of note objects with {note, octave, duration, velocity}
+                        2. "accompaniment": Array of chord objects with {chord, octave, duration, notes, velocity}
+                        3. "tempo": Beats per minute (number)
+                        4. "key": The musical key of the melody (string)
+
+                        For the melody, keep my original notes but feel free to adjust timing for better musicality.
+                        For the accompaniment, create appropriate chords that harmonize with the melody.
+                        Duration should be in milliseconds.
+                        Velocity should be between 0-1 for volume.`,
+                        {
+                            handler: "melody-handler",
+                            stream: false,
+                            openChat: false
+                        }
+                    );
+                } catch (error) {
+                    console.error("Error sending to Claude:", error);
+                    statusText.textContent = 'Error communicating with melody processor. Generating simple melody instead.';
+                    fallbackMelodyGeneration(formattedMelody);
+                }
+            }
+
+            // Fallback melody generation if Claude processing fails
+            function fallbackMelodyGeneration(formattedMelody) {
+                // Create a simple version based just on the detected notes
+                const simpleMusicData = {
+                    melody: formattedMelody.map(note => ({
+                        note: note.note,
+                        octave: note.octave,
+                        duration: note.duration,
+                        velocity: 0.8
+                    })),
+                    accompaniment: [], // No accompaniment in fallback
+                    tempo: 120,
+                    key: "C"
+                };
+
+                createMelody(simpleMusicData);
+            }
+
+            // Create playable melody from processed data
+            function createMelody(musicData) {
+                melody = musicData;
+
+                // Initialize Tone.js
+                Tone.start();
+
+                // Setup instruments if needed
+                if (!synth) {
+                    synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    synth.volume.value = -6; // Lower volume slightly
+                }
+
+                // Enable play button
+                playBtn.disabled = false;
+            }
+
+            // Play the generated music
+            function playGeneratedMusic() {
+                if (!melody || isPlaying) return;
+
+                isPlaying = true;
+                playBtn.disabled = true;
+                stopInstrumentalBtn.disabled = false;
+                statusText.textContent = 'Playing instrumental...';
+
+                // Schedule notes and chords
+                const now = Tone.now();
+                let currentTime = now;
+
+                // Play melody notes
+                if (melody.melody && melody.melody.length > 0) {
+                    melody.melody.forEach(note => {
+                        const duration = note.duration / 1000; // Convert to seconds
+                        synth.triggerAttackRelease(
+                            `${note.note}${note.octave}`,
+                            duration,
+                            currentTime,
+                            note.velocity || 0.8
+                        );
+                        currentTime += duration;
+                    });
+                }
+
+                // Reset after playing (add a small buffer after the last note)
+                Tone.Transport.scheduleOnce(() => {
+                    isPlaying = false;
+                    playBtn.disabled = false;
+                    stopInstrumentalBtn.disabled = true;
+                    statusText.textContent = 'Playback complete. Click Play to listen again.';
+                }, currentTime + 0.5);
+
+                // Start Transport if it's not running
+                if (Tone.Transport.state !== 'started') {
+                    Tone.Transport.start();
+                }
+            }
+
+            // Stop playback
+            function stopPlayback() {
+                if (!isPlaying) return;
+
+                synth.releaseAll();
+                Tone.Transport.cancel(); // Clear all scheduled events
+
+                isPlaying = false;
+                playBtn.disabled = false;
+                stopInstrumentalBtn.disabled = true;
+                statusText.textContent = 'Playback stopped. Click Play to listen again.';
+            }
+
+            // Reset for a new recording
+            function resetForNewRecording() {
+                resultCard.style.display = 'none';
+                stopPlayback();
+                recordBtn.disabled = false;
+                stopBtn.disabled = true;
+                generateBtn.disabled = true;
+                statusText.textContent = 'Ready to record your melody';
+                noteDisplay.textContent = '';
+                stopVisualizer();
+                volumeMeter.style.width = '0%';
+            }
+
+            // Event listeners
+            recordBtn.addEventListener('click', startRecording);
+            stopBtn.addEventListener('click', stopRecording);
+            generateBtn.addEventListener('click', generateMusic);
+            playBtn.addEventListener('click', playGeneratedMusic);
+            stopInstrumentalBtn.addEventListener('click', stopPlayback);
+            reRecordBtn.addEventListener('click', resetForNewRecording);
+
+            // Check for microphone permissions on page load
+            setupAudio().then(hasPermission => {
+                if (hasPermission) {
+                    statusText.textContent = 'Ready to record your melody';
+                    recordBtn.disabled = false;
+                } else {
+                    recordBtn.disabled = true;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
